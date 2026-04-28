@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./models:/app/models
+      - ./cookies:/app/cookies
+    environment:
+      - FLASK_ENV=production
+      - PYTHON_UNBUFFERED=1
+    command: python app.py
+    networks:
+      - stadium-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - stadium-network
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+
+networks:
+  stadium-network:
+    driver: bridge

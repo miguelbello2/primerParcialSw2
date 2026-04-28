@@ -1,0 +1,157 @@
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import './AnalysisResults.css';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const POLL_INTERVAL = 2000;
+
+export default function AnalysisResults({ taskId, fileId }) {
+  const [status, setStatus] = useState('idle');
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [selectedTab, setSelectedTab] = useState('overview');
+  const [streamStats, setStreamStats] = useState({ person_count: 0, frame_num: 0 });
+  const [streamError, setStreamError] = useState(false);
+  const [useVideoFallback, setUseVideoFallback] = useState(true); // default: native video (instant)
+  const intervalRef = useRef(null);
+  const statsIntervalRef = useRef(null);
+
+  // Poll analysis task status
+  useEffect(() => {
+    if (!taskId) return;
+
+    setStatus('polling');
+    setData(null);
+    setError(null);
+
+    intervalRef.current = setInterval(async () => {
+      try {
+        const { data: task } = await axios.get(`${API_URL}/api/task/${taskId}`);
+        if (task.status === 'completed') {
+          clearInterval(intervalRef.current);
+          const { data: results } = await axios.get(`${API_URL}/api/results/${taskId}`);
+          setData(results);
+          setStatus('completed');
+        } else if (task.status === 'failed') {
+          clearInterval(intervalRef.current);
+          setError(task.error || 'El análisis falló');
+          setStatus('failed');
+        }
+      } catch (err) {
+        clearInterval(intervalRef.current);
+        setError('Error al obtener el estado del análisis');
+        setStatus('failed');
+      }
+    }, POLL_INTERVAL);
+
+    return () => clearInterval(intervalRef.current);
+  }, [taskId]);
+
+  // Poll stream stats
+  useEffect(() => {
+    if (!fileId) return;
+    statsIntervalRef.current = setInterval(async () => {
+      try {
+        const { data: stats } = await axios.get(
+          `${API_URL}/api/stream/stats?filename=${encodeURIComponent(fileId)}`
+        );
+        setStreamStats(stats);
+      } catch (_) {}
+    }, POLL_INTERVAL);
+    return () => clearInterval(statsIntervalRef.current);
+  }, [fileId]);
+
+  const isVideo = fileId && /\.(mp4|avi|mov|mkv|webm|m4v|ts|flv)$/i.test(fileId);
+  const streamUrl = isVideo
+    ? `${API_URL}/api/stream/video?filename=${encodeURIComponent(fileId)}`
+    : null;
+  const directVideoUrl = isVideo
+    ? `${API_URL}/api/video/${encodeURIComponent(fileId)}`
+    : null;
+
+  if (!taskId && !fileId) {
+    return (
+      <div className="analysis-results">
+        <h2 className="page-title">Resultados de Análisis</h2>
+        <div className="empty-state">
+          <p>No hay análisis disponible. Por favor, sube un archivo primero.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const statusBadgeText =
+    status === 'polling' ? '🔄 ANALIZANDO' :
+    status === 'completed' ? '✓ COMPLETADO' :
+    status === 'failed' ? '✕ ERROR' : 'EN VIVO';
+
+  const statusBadgeClass =
+    status === 'completed' ? 'badge-completed' :
+    status === 'failed' ? 'badge-failed' : 'badge-live';
+
+  return (
+    <div className="analysis-results">
+      <h2 className="page-title">Análisis en Tiempo Real</h2>
+
+      <div className={`analysis-layout ${!streamUrl ? 'no-video' : ''}`}>
+
+
+
+        {/* ── Results panel column ── */}
+        <div className="results-panel">
+          {status === 'polling' && (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Analizando video...</p>
+              <small>Esto puede tardar unos minutos dependiendo del tamaño del archivo</small>
+            </div>
+          )}
+
+          {status === 'failed' && (
+            <div className="empty-state error">
+              <p>El análisis falló: {error}</p>
+            </div>
+          )}
+
+          {status === 'completed' && data && (
+            <>
+              <div className="tabs">
+                <button className="tab-btn active">Resumen</button>
+              </div>
+
+              {selectedTab === 'overview' && (
+                <div className="tab-content">
+                  <div className="results-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                    <div className="result-card">
+                      <h3>Total de Personas</h3>
+                      <p className="metric-value">{Math.round((data.average_density || 0) * 50)}</p>
+                      <p className="metric-desc">detectadas en promedio</p>
+                    </div>
+                    <div className="result-card">
+                      <h3>Densidad Promedio</h3>
+                      <p className="metric-value">{data.average_density?.toFixed(2) ?? 'N/A'}</p>
+                      <p className="metric-desc">personas/m²</p>
+                    </div>
+                    <div className="result-card">
+                      <h3>Estado de Ánimo</h3>
+                      <p className="metric-value">
+                        {(data.average_density || 0) < 0.3 ? 'Tranquilo' : (data.average_density || 0) < 0.8 ? 'Animado' : (data.average_density || 0) < 1.5 ? 'Eufórico' : 'Tenso'}
+                      </p>
+                      <p className="metric-desc">predominante</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
+              <div className="actions">
+                <button className="action-btn export">📥 Exportar Reporte</button>
+                <button className="action-btn pdf">📄 Generar PDF</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
