@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
+# Allow all origins and include the ngrok header in allowed headers
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True, allow_headers=["*", "ngrok-skip-browser-warning"])
 
 
 # Configuration

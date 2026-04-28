@@ -43,13 +43,24 @@ class VisionAnalyzer:
         self._yolo = None
 
     def _get_yolo(self):
-        """Lazy-load YOLOv8n. Uses local weights if available, else downloads."""
+        """Lazy-load YOLOv8m. Uses local weights if available, else downloads."""
         if self._yolo is None:
             try:
                 from ultralytics import YOLO
-                model_arg = str(_LOCAL_MODEL) if _LOCAL_MODEL.exists() else 'yolov8n.pt'
-                logger.info("Loading YOLO from: %s", model_arg)
-                self._yolo = YOLO(model_arg)
+                # Use YOLOv8m (Medium) for better accuracy on GPU
+                self.model_name = 'yolov8m.pt'
+                self.model_path = MODELS_FOLDER / self.model_name
+                
+                logger.info(f"Loading model {self.model_name}...")
+                self._yolo = YOLO(self.model_name)
+                
+                # Move model to GPU if available
+                if torch.cuda.is_available():
+                    self._yolo.to('cuda')
+                    logger.info("Using GPU (CUDA) for inference")
+                else:
+                    logger.warning("GPU not found, falling back to CPU")
+
                 if not _LOCAL_MODEL.exists():
                     import shutil
                     src = Path(self._yolo.ckpt_path)
