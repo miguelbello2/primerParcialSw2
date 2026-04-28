@@ -139,6 +139,10 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      {/* Debug Info - Borrar después de confirmar conexión */}
+      <div style={{ marginTop: '2rem', fontSize: '0.7rem', color: '#666', textAlign: 'center', borderTop: '1px solid #333', paddingTop: '1rem' }}>
+        Conectando a: {API_URL}
+      </div>
     </div>
   );
 }
