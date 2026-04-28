@@ -12,7 +12,6 @@ export default function Dashboard() {
     mood: 'N/A',
     timestamp: null
   });
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
 
@@ -39,7 +38,7 @@ export default function Dashboard() {
       setError('No se pudo conectar con el servidor');
       console.error('Stats fetch error:', err);
     } finally {
-      setLoading(false);
+      // No loading state needed
     }
   };
 

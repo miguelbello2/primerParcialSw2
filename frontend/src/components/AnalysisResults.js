@@ -9,10 +9,7 @@ export default function AnalysisResults({ taskId, fileId }) {
   const [status, setStatus] = useState('idle');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [selectedTab, setSelectedTab] = useState('overview');
-  const [streamStats, setStreamStats] = useState({ person_count: 0, frame_num: 0 });
-  const [streamError, setStreamError] = useState(false);
-  const [useVideoFallback, setUseVideoFallback] = useState(true); // default: native video (instant)
+  const [error, setError] = useState(null);
   const intervalRef = useRef(null);
   const statsIntervalRef = useRef(null);
 
@@ -47,26 +44,11 @@ export default function AnalysisResults({ taskId, fileId }) {
     return () => clearInterval(intervalRef.current);
   }, [taskId]);
 
-  // Poll stream stats
-  useEffect(() => {
-    if (!fileId) return;
-    statsIntervalRef.current = setInterval(async () => {
-      try {
-        const { data: stats } = await axios.get(
-          `${API_URL}/api/stream/stats?filename=${encodeURIComponent(fileId)}`
-        );
-        setStreamStats(stats);
-      } catch (_) {}
-    }, POLL_INTERVAL);
-    return () => clearInterval(statsIntervalRef.current);
-  }, [fileId]);
+
 
   const isVideo = fileId && /\.(mp4|avi|mov|mkv|webm|m4v|ts|flv)$/i.test(fileId);
   const streamUrl = isVideo
     ? `${API_URL}/api/stream/video?filename=${encodeURIComponent(fileId)}`
-    : null;
-  const directVideoUrl = isVideo
-    ? `${API_URL}/api/video/${encodeURIComponent(fileId)}`
     : null;
 
   if (!taskId && !fileId) {
@@ -80,14 +62,7 @@ export default function AnalysisResults({ taskId, fileId }) {
     );
   }
 
-  const statusBadgeText =
-    status === 'polling' ? '🔄 ANALIZANDO' :
-    status === 'completed' ? '✓ COMPLETADO' :
-    status === 'failed' ? '✕ ERROR' : 'EN VIVO';
 
-  const statusBadgeClass =
-    status === 'completed' ? 'badge-completed' :
-    status === 'failed' ? 'badge-failed' : 'badge-live';
 
   return (
     <div className="analysis-results">
@@ -119,7 +94,7 @@ export default function AnalysisResults({ taskId, fileId }) {
                 <button className="tab-btn active">Resumen</button>
               </div>
 
-              {selectedTab === 'overview' && (
+              {true && (
                 <div className="tab-content">
                   <div className="results-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                     <div className="result-card">
