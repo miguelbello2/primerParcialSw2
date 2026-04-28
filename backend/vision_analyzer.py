@@ -7,11 +7,14 @@ import cv2
 import numpy as np
 from pathlib import Path
 import logging
+import torch
+from ultralytics import YOLO
 
 logger = logging.getLogger(__name__)
 
 PERSON_CLASS_ID = 0  # COCO class 0 = person
-_LOCAL_MODEL = Path('models/yolov8n.pt')
+MODELS_FOLDER = Path('models')
+_LOCAL_MODEL = MODELS_FOLDER / 'yolov8l.pt'
 
 
 def _nms(boxes, scores, iou_threshold=0.4):
@@ -43,12 +46,11 @@ class VisionAnalyzer:
         self._yolo = None
 
     def _get_yolo(self):
-        """Lazy-load YOLOv8m. Uses local weights if available, else downloads."""
+        """Lazy-load YOLOv8l. Uses local weights if available, else downloads."""
         if self._yolo is None:
             try:
-                from ultralytics import YOLO
-                # Use YOLOv8m (Medium) for better accuracy on GPU
-                self.model_name = 'yolov8m.pt'
+                # Use YOLOv8l (Large) for maximum precision in crowds
+                self.model_name = 'yolov8l.pt'
                 self.model_path = MODELS_FOLDER / self.model_name
                 
                 logger.info(f"Loading model {self.model_name}...")
@@ -61,31 +63,26 @@ class VisionAnalyzer:
                 else:
                     logger.warning("GPU not found, falling back to CPU")
 
-                if not _LOCAL_MODEL.exists():
-                    import shutil
-                    src = Path(self._yolo.ckpt_path)
-                    if src.exists():
-                        shutil.copy(src, _LOCAL_MODEL)
-                logger.info("YOLOv8n loaded OK — ckpt: %s", getattr(self._yolo, 'ckpt_path', 'unknown'))
+                logger.info("YOLOv8l loaded OK")
             except Exception as e:
-                logger.error("Failed to load YOLOv8n: %s", e)
+                logger.error("Failed to load YOLOv8l: %s", e)
                 raise
         return self._yolo
 
     def detect_persons(self, frame):
-        """Detect persons using tiled YOLOv8n inference.
+        """Detect persons using tiled YOLOv8l inference.
 
-        Splits the frame into overlapping 640×640 tiles and runs YOLO on each
-        tile independently, then merges results with NMS.  This is essential
-        for aerial/stadium footage where people occupy only a few pixels in the
-        full-frame view — a single full-frame pass at any imgsz misses them.
+        Splits the frame into overlapping 480×480 tiles and runs YOLO on each
+        tile independently, then merges results with NMS.
         """
         try:
             model = self._get_yolo()
             h, w = frame.shape[:2]
 
-            TILE = 640      # tile size fed to YOLO
-            OVERLAP = 0.2   # 20 % overlap between adjacent tiles
+            # Reduced tile size + High resolution inference = Zoom Effect
+            TILE = 480      # smaller tile area
+            OVERLAP = 0.25  # 25% overlap for better coverage
+            IMGSZ = 960     # High resolution inference per tile
 
             stride = int(TILE * (1 - OVERLAP))
             raw_boxes = []  # (x1, y1, x2, y2, conf)
@@ -101,7 +98,8 @@ class VisionAnalyzer:
                     if tile.size == 0:
                         continue
 
-                    results = model(tile, classes=[PERSON_CLASS_ID], verbose=False, conf=0.05, iou=0.4)
+                    # Run inference at 960px resolution for the 480px tile (2x zoom)
+                    results = model(tile, classes=[PERSON_CLASS_ID], verbose=False, conf=0.05, iou=0.5, imgsz=IMGSZ)
                     for result in results:
                         for box in result.boxes:
                             bx1, by1, bx2, by2 = map(int, box.xyxy[0].tolist())
