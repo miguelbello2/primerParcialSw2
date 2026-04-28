@@ -5,9 +5,7 @@ import './UploadPanel.css';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
-  const [sourceType, setSourceType] = useState('file'); // 'file' | 'youtube'
   const [file, setFile] = useState(null);
-  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [analysisType, setAnalysisType] = useState('crowd');
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -24,12 +22,8 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
   const handleUploadAndAnalyze = async (e) => {
     e.preventDefault();
 
-    if (sourceType === 'file' && !file) {
+    if (!file) {
       setMessage({ type: 'error', text: 'Por favor selecciona un archivo' });
-      return;
-    }
-    if (sourceType === 'youtube' && !youtubeUrl.trim()) {
-      setMessage({ type: 'error', text: 'Por favor ingresa una URL de YouTube' });
       return;
     }
 
@@ -39,28 +33,21 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
     try {
       let fileId;
 
-      if (sourceType === 'youtube') {
-        setMessage({ type: 'info', text: 'Descargando video de YouTube...' });
-        const ytResponse = await axios.post(`${API_URL}/api/upload/youtube`, { url: youtubeUrl.trim() });
-        fileId = ytResponse.data.file_id;
-        setMessage({ type: 'success', text: `Video descargado: ${fileId}` });
-      } else {
-        // Upload file
-        const formData = new FormData();
-        formData.append('file', file);
+      // Upload file
+      const formData = new FormData();
+      formData.append('file', file);
 
-        const fileType = file.type.startsWith('video') ? 'video' : 'image';
-        const uploadEndpoint = fileType === 'video' ? '/api/upload/video' : '/api/upload/image';
+      const fileType = file.type.startsWith('video') ? 'video' : 'image';
+      const uploadEndpoint = fileType === 'video' ? '/api/upload/video' : '/api/upload/image';
 
-        const uploadResponse = await axios.post(`${API_URL}${uploadEndpoint}`, formData, {
-          onUploadProgress: (progressEvent) => {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            setUploadProgress(progress);
-          },
-        });
-        fileId = uploadResponse.data.file_id;
-        setMessage({ type: 'success', text: `Archivo subido: ${fileId}` });
-      }
+      const uploadResponse = await axios.post(`${API_URL}${uploadEndpoint}`, formData, {
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(progress);
+        },
+      });
+      fileId = uploadResponse.data.file_id;
+      setMessage({ type: 'success', text: `Archivo subido: ${fileId}` });
 
       // Start analysis
       const analysisEndpoint = analysisType === 'crowd' ? '/api/analyze/video/crowd' : '/api/analyze/video/incidents';
@@ -96,25 +83,7 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
       <div className="upload-container">
         <form onSubmit={handleUploadAndAnalyze} className="upload-form">
 
-          <div className="form-group">
-            <label>Fuente del video</label>
-            <div className="source-tabs">
-              <button
-                type="button"
-                className={`source-tab ${sourceType === 'file' ? 'active' : ''}`}
-                onClick={() => { setSourceType('file'); setMessage(null); }}
-              >
-                Archivo local
-              </button>
-              <button
-                type="button"
-                className={`source-tab ${sourceType === 'youtube' ? 'active' : ''}`}
-                onClick={() => { setSourceType('youtube'); setMessage(null); }}
-              >
-                YouTube URL
-              </button>
-            </div>
-          </div>
+
 
           <div className="form-group">
             <label>Tipo de Análisis</label>
@@ -142,43 +111,26 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
             </div>
           </div>
 
-          {sourceType === 'file' ? (
-            <div className="form-group">
-              <label>Selecciona un archivo (video o imagen)</label>
-              <div className="file-input-wrapper">
-                <input
-                  type="file"
-                  id="fileInput"
-                  onChange={handleFileChange}
-                  accept="video/*,image/*"
-                  disabled={loading}
-                />
-                <label htmlFor="fileInput" className="file-input-label">
-                  {file ? `${file.name}` : '📁 Arrastra un archivo aquí o haz clic'}
-                </label>
-              </div>
-              {file && (
-                <p className="file-info">
-                  Tamaño: {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="form-group">
-              <label>URL de YouTube</label>
+          <div className="form-group">
+            <label>Selecciona un archivo (video o imagen)</label>
+            <div className="file-input-wrapper">
               <input
-                type="url"
-                className="youtube-input"
-                placeholder="https://www.youtube.com/watch?v=..."
-                value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
+                type="file"
+                id="fileInput"
+                onChange={handleFileChange}
+                accept="video/*,image/*"
                 disabled={loading}
               />
-              <small className="input-hint">
-                El video se descargará automáticamente (máx. 720p)
-              </small>
+              <label htmlFor="fileInput" className="file-input-label">
+                {file ? `${file.name}` : '📁 Arrastra un archivo aquí o haz clic'}
+              </label>
             </div>
-          )}
+            {file && (
+              <p className="file-info">
+                Tamaño: {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            )}
+          </div>
 
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="progress-container">
@@ -190,9 +142,9 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
           <button
             type="submit"
             className="submit-btn"
-            disabled={loading || (sourceType === 'file' ? !file : !youtubeUrl.trim())}
+            disabled={loading || !file}
           >
-            {loading ? 'Procesando...' : sourceType === 'youtube' ? 'Descargar y Analizar' : 'Subir y Analizar'}
+            {loading ? 'Procesando...' : 'Subir y Analizar'}
           </button>
         </form>
 

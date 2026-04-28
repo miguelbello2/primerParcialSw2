@@ -70,12 +70,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-_YOUTUBE_RE = re.compile(
-    r'(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/)[\w\-]+'
-)
 
-def is_youtube_url(url):
-    return bool(_YOUTUBE_RE.match(url))
 
 
 # ==================== HEALTH CHECK ====================
@@ -164,71 +159,7 @@ def upload_image():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/upload/youtube', methods=['POST'])
-def upload_youtube():
-    """Download a YouTube video and return a file_id for analysis"""
-    try:
-        import yt_dlp
 
-        data = request.get_json()
-        url = data.get('url', '').strip()
-
-        if not url:
-            return jsonify({'error': 'No URL provided'}), 400
-
-        if not is_youtube_url(url):
-            return jsonify({'error': 'Invalid YouTube URL'}), 400
-
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        base_name = f"{timestamp}_youtube"
-        outtmpl = str(UPLOAD_FOLDER / f"{base_name}.%(ext)s")
-
-        cookies_file = Path('cookies/cookies.txt')
-
-        ydl_opts = {
-            'format': 'best[height<=720]/best',
-            'outtmpl': outtmpl,
-            'merge_output_format': 'mp4',
-            'quiet': True,
-            'no_warnings': True,
-            'geo_bypass': True,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['ios'],
-                    'player_skip': ['webpage', 'configs'],
-                }
-            },
-        }
-
-        if cookies_file.exists():
-            ydl_opts['cookiefile'] = str(cookies_file)
-            logger.info("Using cookies file for YouTube download")
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-
-        downloaded = list(UPLOAD_FOLDER.glob(f"{base_name}.*"))
-        if not downloaded:
-            return jsonify({'error': 'Download failed'}), 500
-
-        filepath = downloaded[0]
-        filename = filepath.name
-        logger.info(f"YouTube video downloaded: {filename}")
-        
-        global latest_uploaded_file
-        latest_uploaded_file = filename
-
-        return jsonify({
-            'success': True,
-            'file_id': filename,
-            'filename': filename,
-            'size': filepath.stat().st_size,
-            'upload_time': datetime.now().isoformat()
-        }), 201
-
-    except Exception as e:
-        logger.error(f"YouTube download error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
 
 
 # ==================== ANALYSIS ENDPOINTS ====================

@@ -47,7 +47,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>Stadium Vision System © 2024 | Powered by OpenCV & IA</p>
+        <p>Stadium Vision System © 2026 | Powered by YOLOv8n nano</p>
       </footer>
     </div>
   );
