@@ -3,6 +3,7 @@ import axios from 'axios';
 import './UploadPanel.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 
 export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
   const [file, setFile] = useState(null);

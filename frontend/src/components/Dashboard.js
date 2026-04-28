@@ -5,6 +5,9 @@ import './Dashboard.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+// Skip ngrok browser warning for all requests
+axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
+
 export default function Dashboard() {
   const [stats, setStats] = useState({
     people_per_minute: 0,

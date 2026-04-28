@@ -3,6 +3,7 @@ import axios from 'axios';
 import './AnalysisResults.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 const POLL_INTERVAL = 2000;
 
 export default function AnalysisResults({ taskId, fileId }) {
