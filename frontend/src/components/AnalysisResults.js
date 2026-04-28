@@ -9,9 +9,7 @@ export default function AnalysisResults({ taskId, fileId }) {
   const [status, setStatus] = useState('idle');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [error, setError] = useState(null);
   const intervalRef = useRef(null);
-  const statsIntervalRef = useRef(null);
 
   // Poll analysis task status
   useEffect(() => {
