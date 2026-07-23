@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import './UploadPanel.css';
-import api from '../api';
+import api, { getApiUrl } from '../api';
+
+// Cloudflare (plan gratuito) rechaza cuerpos de request mayores a 100 MB, así
+// que avisamos antes de subir en vez de esperar un 413 a mitad de camino.
+const MAX_UPLOAD_MB = 100;
 
 export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
   const [file, setFile] = useState(null);
@@ -22,6 +26,16 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
 
     if (!file) {
       setMessage({ type: 'error', text: 'Por favor selecciona un archivo' });
+      return;
+    }
+
+    const sizeMB = file.size / 1024 / 1024;
+    if (sizeMB > MAX_UPLOAD_MB) {
+      setMessage({
+        type: 'error',
+        text: `El archivo pesa ${sizeMB.toFixed(0)} MB y el túnel corta en ${MAX_UPLOAD_MB} MB. `
+          + 'Recorta el video o bájale la resolución antes de subirlo.',
+      });
       return;
     }
 
@@ -65,10 +79,22 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
         setCurrentPage('dashboard');
       }, 2000);
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error.response?.data?.error || 'Error al procesar el archivo',
-      });
+      // Distinguir «el backend respondió con un error» de «no hubo respuesta»:
+      // el mensaje genérico anterior ocultaba justamente el caso más común,
+      // que es no llegar al backend (URL caída, CORS o contenido mixto).
+      let text;
+      if (error.response) {
+        text = error.response.data?.error
+          || `El backend respondió ${error.response.status}`;
+        if (error.response.status === 413) {
+          text = `Archivo demasiado grande para el túnel (límite ${MAX_UPLOAD_MB} MB).`;
+        }
+      } else {
+        text = `No se pudo contactar al backend en ${getApiUrl()}. `
+          + 'Revisa que la sesión de Colab siga viva y que la URL sea la actual.';
+      }
+      setMessage({ type: 'error', text });
+      console.error('Upload/analysis error:', error);
     } finally {
       setLoading(false);
     }
@@ -161,7 +187,7 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
         <ul>
           <li><strong>Video:</strong> MP4, AVI, MOV, MKV</li>
           <li><strong>Imagen:</strong> JPG, PNG</li>
-          <li><strong>Tamaño máximo:</strong> 500 MB</li>
+          <li><strong>Tamaño máximo:</strong> {MAX_UPLOAD_MB} MB (límite del túnel)</li>
         </ul>
       </div>
 

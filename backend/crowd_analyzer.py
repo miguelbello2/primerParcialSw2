@@ -174,11 +174,14 @@ class CrowdAnalyzer(VisionAnalyzer):
     def analyze(self, filepath):
         """Complete crowd analysis on video.
 
-        Samples one frame every SAMPLE_EVERY frames so YOLO doesn't have
-        to run on every single frame (stadium videos are slow on CPU).
+        Muestrea como máximo MAX_SAMPLES fotogramas repartidos por todo el
+        video: con un intervalo fijo, un video largo dispara el número de
+        inferencias y el análisis nunca termina.
         Returns field names that match what the frontend expects.
         """
-        SAMPLE_EVERY = 30   # analyse ~1 frame per second at 30 fps
+        MAX_SAMPLES = 40     # techo de inferencias, sin importar la duración
+        MIN_SAMPLE_EVERY = 30  # ~1 muestra/segundo a 30 fps para videos cortos
+        DETECT_WIDTH = 1280  # ancho máximo para detectar (ver nota abajo)
 
         try:
             cap = cv2.VideoCapture(filepath)
@@ -191,10 +194,14 @@ class CrowdAnalyzer(VisionAnalyzer):
             vid_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             vid_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             duration_s = total_frames / fps if fps > 0 else 0
+
+            # Intervalo adaptativo: se estira en videos largos para no pasar de
+            # MAX_SAMPLES inferencias, que es lo que define cuánto tarda todo.
+            sample_every = max(MIN_SAMPLE_EVERY, total_frames // MAX_SAMPLES) if total_frames > 0 else MIN_SAMPLE_EVERY
             logger.info(
                 "Video info: %s | %dx%d | %.1f fps | %d total frames (~%.1f s) | will sample every %d frames (~%d samples)",
                 filepath, vid_w, vid_h, fps, total_frames, duration_s,
-                SAMPLE_EVERY, max(1, total_frames // SAMPLE_EVERY)
+                sample_every, max(1, total_frames // sample_every)
             )
 
             frame_count = 0
@@ -211,14 +218,22 @@ class CrowdAnalyzer(VisionAnalyzer):
                     break
                 frame_count += 1
 
-                if frame_count % SAMPLE_EVERY != 0:
+                if frame_count % sample_every != 0:
                     continue
 
-                # Pass the original frame to YOLO (imgsz=1280 handles internal resize).
-                # Keep a smaller copy only for optical-flow motion detection.
-                frame_small = cv2.resize(frame, (1280, 720))
+                # Detectar sobre una copia reducida, NO sobre el original:
+                # detect_persons trocea en tiles de 640px, así que un fotograma
+                # 1080p daba 12 tiles y uno 4K daba 40 — el mismo trabajo que a
+                # 1280px se hace en 6, sin cambiar lo que el modelo alcanza a ver
+                # (yolov8n infiere a 640px de todos modos).
+                fh, fw = frame.shape[:2]
+                if fw > DETECT_WIDTH:
+                    scale = DETECT_WIDTH / fw
+                    frame_small = cv2.resize(frame, (DETECT_WIDTH, int(fh * scale)))
+                else:
+                    frame_small = frame
 
-                density_map = self.calculate_crowd_density(frame)
+                density_map = self.calculate_crowd_density(frame_small)
                 last_density_map = density_map
 
                 densities_in_frame = [d['density'] for d in density_map]

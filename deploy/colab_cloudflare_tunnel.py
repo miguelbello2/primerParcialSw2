@@ -68,12 +68,14 @@ print("✔ YOLOv8n cargado")
 #   en memoria del proceso; con más workers cada request cae en uno distinto.
 # --timeout 0: el endpoint MJPEG deja la respuesta abierta indefinidamente y el
 #   timeout por defecto (30 s) mataría al worker a mitad del stream.
+# --threads 16: cada <img> del stream ocupa un hilo mientras el cliente siga
+#   conectado; recargar la pestaña varias veces los acumula y bloquea el upload.
 subprocess.run(["pkill", "-f", "gunicorn"], capture_output=True)
 time.sleep(1)
 
 backend_log = open(BACKEND_LOG, "w")
 subprocess.Popen(
-    ["gunicorn", "--bind", f"0.0.0.0:{PORT}", "--workers", "1", "--threads", "8",
+    ["gunicorn", "--bind", f"0.0.0.0:{PORT}", "--workers", "1", "--threads", "16",
      "--timeout", "0", "--log-level", "info", "app:app"],
     stdout=backend_log, stderr=subprocess.STDOUT,
 )

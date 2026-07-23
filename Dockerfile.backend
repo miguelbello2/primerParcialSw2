@@ -52,8 +52,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
 # memoria del proceso, así que varios workers servirían datos inconsistentes.
 # --timeout 0: el endpoint MJPEG deja la respuesta abierta indefinidamente y el
 # timeout por defecto de gunicorn mataría al worker a mitad del stream.
+# 16 hilos: cada <img> del stream ocupa uno mientras el cliente siga conectado,
+# y una pestaña recargada varias veces los acumula hasta bloquear los uploads.
 CMD gunicorn --bind 0.0.0.0:${PORT} \
-    --workers 1 --threads 8 \
+    --workers 1 --threads 16 \
     --timeout 0 \
     --log-level info \
     app:app
