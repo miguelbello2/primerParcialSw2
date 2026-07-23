@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './Dashboard.css';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-// Skip ngrok browser warning for all requests
-axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
+import api, { apiUrl, getApiUrl, setApiUrl } from '../api';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -17,6 +12,9 @@ export default function Dashboard() {
   });
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
+  const [backendUrl, setBackendUrl] = useState(getApiUrl());
+  const [editingUrl, setEditingUrl] = useState(false);
+  const [urlDraft, setUrlDraft] = useState(getApiUrl());
 
   useEffect(() => {
     fetchStats();
@@ -26,7 +24,7 @@ export default function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/results/latest`);
+      const response = await api.get('/api/results/latest');
       const newStats = response.data;
       setStats(newStats);
       setError(null);
@@ -47,7 +45,7 @@ export default function Dashboard() {
 
   const handleStopAnalysis = async () => {
     try {
-      await axios.post(`${API_URL}/api/stream/stop`);
+      await api.post('/api/stream/stop');
       // Immediately reset local state to stop video stream
       setStats(prev => ({ ...prev, active_file_id: null }));
     } catch (err) {
@@ -55,8 +53,15 @@ export default function Dashboard() {
     }
   };
 
-  const streamUrl = stats.active_file_id 
-    ? `${API_URL}/api/stream/video?filename=${encodeURIComponent(stats.active_file_id)}`
+  const handleSaveUrl = (e) => {
+    e.preventDefault();
+    setBackendUrl(setApiUrl(urlDraft));
+    setEditingUrl(false);
+    setError(null);
+  };
+
+  const streamUrl = stats.active_file_id
+    ? apiUrl(`/api/stream/video?filename=${encodeURIComponent(stats.active_file_id)}`)
     : null;
 
   return (
@@ -139,9 +144,31 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      {/* Debug Info - Borrar después de confirmar conexión */}
-      <div style={{ marginTop: '2rem', fontSize: '0.7rem', color: '#666', textAlign: 'center', borderTop: '1px solid #333', paddingTop: '1rem' }}>
-        Conectando a: {API_URL}
+      <div className="backend-config">
+        {editingUrl ? (
+          <form onSubmit={handleSaveUrl} className="backend-config-form">
+            <input
+              type="url"
+              value={urlDraft}
+              onChange={(e) => setUrlDraft(e.target.value)}
+              placeholder="https://xxxx.ngrok-free.app"
+              autoFocus
+            />
+            <button type="submit">Guardar</button>
+            <button
+              type="button"
+              onClick={() => { setUrlDraft(backendUrl); setEditingUrl(false); }}
+            >
+              Cancelar
+            </button>
+          </form>
+        ) : (
+          <>
+            <span className={error ? 'backend-dot offline' : 'backend-dot online'} />
+            Backend: <code>{backendUrl}</code>
+            <button type="button" onClick={() => setEditingUrl(true)}>Cambiar</button>
+          </>
+        )}
       </div>
     </div>
   );

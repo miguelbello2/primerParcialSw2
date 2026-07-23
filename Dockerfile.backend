@@ -1,7 +1,5 @@
 FROM python:3.11-slim
 
-WORKDIR /app
-
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     libgl1 \
@@ -14,24 +12,48 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
+# Correr sin root: varias PaaS lo exigen y ninguna lo penaliza. Sin un usuario
+# propio, escribir en uploads/ o results/ falla con permiso denegado.
+RUN useradd -m -u 1000 appuser
+USER appuser
+ENV PATH=/home/appuser/.local/bin:$PATH \
+    HOME=/home/appuser
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /app
 
-# Copy application code
-COPY backend/ .
-COPY models/ ./models/
+# torch CPU-only: el wheel por defecto arrastra ~2.5GB de CUDA que en un tier
+# gratuito no se usa. Se instala antes que el resto para que ultralytics lo
+# encuentre satisfecho y no vuelva a resolver la variante CUDA.
+RUN pip install --no-cache-dir --user \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch==2.5.1 torchvision==0.20.1
 
-# Create necessary directories
+COPY --chown=appuser requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+COPY --chown=appuser backend/ .
+COPY --chown=appuser models/ ./models/
+
 RUN mkdir -p uploads results logs
 
-# Expose port
-EXPOSE 5000
+# ultralytics y matplotlib escriben config en $HOME al arrancar; apuntarlos a
+# rutas propias evita que fallen si el HOME del runtime es de solo lectura.
+ENV PORT=7860 \
+    PYTHONUNBUFFERED=1 \
+    YOLO_CONFIG_DIR=/app/logs \
+    MPLCONFIGDIR=/app/logs
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+EXPOSE 7860
 
-CMD ["python", "app.py"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# 1 worker: el estado (active_tasks, stream_stats, latest_uploaded_file) vive en
+# memoria del proceso, así que varios workers servirían datos inconsistentes.
+# --timeout 0: el endpoint MJPEG deja la respuesta abierta indefinidamente y el
+# timeout por defecto de gunicorn mataría al worker a mitad del stream.
+CMD gunicorn --bind 0.0.0.0:${PORT} \
+    --workers 1 --threads 8 \
+    --timeout 0 \
+    --log-level info \
+    app:app

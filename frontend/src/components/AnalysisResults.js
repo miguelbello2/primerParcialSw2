@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
 import './AnalysisResults.css';
+import api, { apiUrl } from '../api';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 const POLL_INTERVAL = 2000;
 
 export default function AnalysisResults({ taskId, fileId }) {
@@ -22,10 +20,10 @@ export default function AnalysisResults({ taskId, fileId }) {
 
     intervalRef.current = setInterval(async () => {
       try {
-        const { data: task } = await axios.get(`${API_URL}/api/task/${taskId}`);
+        const { data: task } = await api.get(`/api/task/${taskId}`);
         if (task.status === 'completed') {
           clearInterval(intervalRef.current);
-          const { data: results } = await axios.get(`${API_URL}/api/results/${taskId}`);
+          const { data: results } = await api.get(`/api/results/${taskId}`);
           setData(results);
           setStatus('completed');
         } else if (task.status === 'failed') {
@@ -47,7 +45,7 @@ export default function AnalysisResults({ taskId, fileId }) {
 
   const isVideo = fileId && /\.(mp4|avi|mov|mkv|webm|m4v|ts|flv)$/i.test(fileId);
   const streamUrl = isVideo
-    ? `${API_URL}/api/stream/video?filename=${encodeURIComponent(fileId)}`
+    ? apiUrl(`/api/stream/video?filename=${encodeURIComponent(fileId)}`)
     : null;
 
   if (!taskId && !fileId) {

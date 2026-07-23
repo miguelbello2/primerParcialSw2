@@ -15,6 +15,7 @@ from werkzeug.utils import secure_filename
 import io
 from PIL import Image
 import threading
+import os
 import re
 import time
 
@@ -550,10 +551,12 @@ def internal_error(error):
 
 
 if __name__ == '__main__':
-    logger.info("Starting Stadium Vision System Backend")
+    # Las PaaS (HF Spaces, Cloud Run, Render...) inyectan el puerto por entorno
+    port = int(os.environ.get('PORT', 5000))
+    logger.info(f"Starting Stadium Vision System Backend on port {port}")
     app.run(
         host='0.0.0.0',
-        port=5000,
+        port=port,
         debug=False,
         threaded=True
     )

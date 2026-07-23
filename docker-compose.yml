@@ -16,7 +16,8 @@ services:
     environment:
       - FLASK_ENV=production
       - PYTHON_UNBUFFERED=1
-    command: python app.py
+      # La imagen usa 7860 (Hugging Face Spaces); en local mantenemos 5000
+      - PORT=5000
     networks:
       - stadium-network
     healthcheck:

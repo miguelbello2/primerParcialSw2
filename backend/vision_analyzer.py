@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 PERSON_CLASS_ID = 0  # COCO class 0 = person
 MODELS_FOLDER = Path('models')
-_LOCAL_MODEL = MODELS_FOLDER / 'yolov8l.pt'
+MODEL_NAME = 'yolov8n.pt'
+_LOCAL_MODEL = MODELS_FOLDER / MODEL_NAME
 
 
 def _nms(boxes, scores, iou_threshold=0.4):
@@ -46,16 +47,19 @@ class VisionAnalyzer:
         self._yolo = None
 
     def _get_yolo(self):
-        """Lazy-load YOLOv8l. Uses local weights if available, else downloads."""
+        """Lazy-load YOLOv8n. Uses local weights if available, else downloads."""
         if self._yolo is None:
             try:
-                # Use YOLOv8l (Large) for maximum precision in crowds
-                self.model_name = 'yolov8l.pt'
+                # YOLOv8n (nano): corre en CPU de tiers gratuitos a velocidad usable
+                self.model_name = MODEL_NAME
                 self.model_path = MODELS_FOLDER / self.model_name
-                
-                logger.info(f"Loading model {self.model_name}...")
-                self._yolo = YOLO(self.model_name)
-                
+
+                # Prefiere los pesos versionados en models/ para no depender de la
+                # descarga en el arranque (el disco del contenedor es efímero).
+                weights = str(_LOCAL_MODEL) if _LOCAL_MODEL.exists() else self.model_name
+                logger.info(f"Loading model {weights}...")
+                self._yolo = YOLO(weights)
+
                 # Move model to GPU if available
                 if torch.cuda.is_available():
                     self._yolo.to('cuda')
@@ -63,26 +67,26 @@ class VisionAnalyzer:
                 else:
                     logger.warning("GPU not found, falling back to CPU")
 
-                logger.info("YOLOv8l loaded OK")
+                logger.info("YOLOv8n loaded OK")
             except Exception as e:
-                logger.error("Failed to load YOLOv8l: %s", e)
+                logger.error("Failed to load YOLOv8n: %s", e)
                 raise
         return self._yolo
 
     def detect_persons(self, frame):
-        """Detect persons using tiled YOLOv8l inference.
+        """Detect persons using tiled YOLOv8n inference.
 
-        Splits the frame into overlapping 480×480 tiles and runs YOLO on each
+        Splits the frame into overlapping 640×640 tiles and runs YOLO on each
         tile independently, then merges results with NMS.
         """
         try:
             model = self._get_yolo()
             h, w = frame.shape[:2]
 
-            # Reduced tile size + High resolution inference = Zoom Effect
-            TILE = 480      # smaller tile area
+            # Tile e imgsz iguales: sin upscaling, que en nano solo agrega ruido
+            TILE = 640      # tile a la resolución nativa del modelo
             OVERLAP = 0.25  # 25% overlap for better coverage
-            IMGSZ = 960     # High resolution inference per tile
+            IMGSZ = 640     # inference resolution per tile
 
             stride = int(TILE * (1 - OVERLAP))
             raw_boxes = []  # (x1, y1, x2, y2, conf)
@@ -98,8 +102,8 @@ class VisionAnalyzer:
                     if tile.size == 0:
                         continue
 
-                    # Run inference at 960px resolution for the 480px tile (2x zoom)
-                    results = model(tile, classes=[PERSON_CLASS_ID], verbose=False, conf=0.05, iou=0.5, imgsz=IMGSZ)
+                    # conf 0.15: yolov8n a 0.05 genera demasiados falsos positivos
+                    results = model(tile, classes=[PERSON_CLASS_ID], verbose=False, conf=0.15, iou=0.5, imgsz=IMGSZ)
                     for result in results:
                         for box in result.boxes:
                             bx1, by1, bx2, by2 = map(int, box.xyxy[0].tolist())

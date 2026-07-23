@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import './UploadPanel.css';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
+import api from '../api';
 
 export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
   const [file, setFile] = useState(null);
@@ -41,7 +38,7 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
       const fileType = file.type.startsWith('video') ? 'video' : 'image';
       const uploadEndpoint = fileType === 'video' ? '/api/upload/video' : '/api/upload/image';
 
-      const uploadResponse = await axios.post(`${API_URL}${uploadEndpoint}`, formData, {
+      const uploadResponse = await api.post(uploadEndpoint, formData, {
         onUploadProgress: (progressEvent) => {
           const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(progress);
@@ -52,7 +49,7 @@ export default function UploadPanel({ setCurrentPage, setTaskId, setFileId }) {
 
       // Start analysis
       const analysisEndpoint = analysisType === 'crowd' ? '/api/analyze/video/crowd' : '/api/analyze/video/incidents';
-      const analysisResponse = await axios.post(`${API_URL}${analysisEndpoint}`, { file_id: fileId });
+      const analysisResponse = await api.post(analysisEndpoint, { file_id: fileId });
 
       const taskId = analysisResponse.data.task_id;
       setTaskId(taskId);

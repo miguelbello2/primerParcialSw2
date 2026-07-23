@@ -222,3 +222,74 @@
     padding: 1.5rem;
   }
 }
+
+.backend-config {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #333;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.backend-config code {
+  color: #aab;
+  word-break: break-all;
+}
+
+.backend-config button {
+  margin-left: 0.6rem;
+  padding: 0.2rem 0.6rem;
+  background: transparent;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #888;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.backend-config button:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.backend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.backend-dot.online {
+  background: #4caf50;
+}
+
+.backend-dot.offline {
+  background: #f44336;
+}
+
+.backend-config-form {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.backend-config-form input {
+  flex: 1 1 320px;
+  max-width: 460px;
+  padding: 0.4rem 0.7rem;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #ddd;
+  font-size: 0.8rem;
+}
+
+.backend-config-form input:focus {
+  outline: none;
+  border-color: #667eea;
+}
