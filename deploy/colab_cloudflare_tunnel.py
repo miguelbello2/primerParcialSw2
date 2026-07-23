@@ -36,6 +36,12 @@ def run(cmd, **kw):
 
 
 # ---------------------------------------------------------------- 1. Repo
+# Salir de DEST antes de borrarlo: al re-ejecutar la celda, el proceso sigue
+# parado dentro de DEST/backend de la corrida anterior, y borrar el directorio
+# actual deja un cwd colgado que hace fallar a git con
+# "Unable to read current working directory".
+os.chdir("/content")
+
 # Clon limpio: evita arrastrar estado de una ejecución anterior
 if os.path.exists(DEST):
     shutil.rmtree(DEST)
